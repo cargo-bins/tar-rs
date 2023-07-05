@@ -23,6 +23,7 @@ pub struct Archive<R: ?Sized + Read> {
 
 pub struct ArchiveInner<R: ?Sized> {
     pos: Cell<u64>,
+    mask: u32,
     unpack_xattrs: bool,
     preserve_permissions: bool,
     preserve_ownerships: bool,
@@ -54,6 +55,7 @@ impl<R: Read> Archive<R> {
     pub fn new(obj: R) -> Archive<R> {
         Archive {
             inner: ArchiveInner {
+                mask: u32::MIN,
                 unpack_xattrs: false,
                 preserve_permissions: false,
                 preserve_ownerships: false,
@@ -107,6 +109,20 @@ impl<R: Read> Archive<R> {
     pub fn unpack<P: AsRef<Path>>(&mut self, dst: P) -> io::Result<()> {
         let me: &mut Archive<dyn Read> = self;
         me._unpack(dst.as_ref())
+    }
+
+    /// Set the mask of the permission bits when unpacking this entry.
+    ///
+    /// The mask will be inverted when applying against a mode, similar to how
+    /// `umask` works on Unix. In logical notation it looks like:
+    ///
+    /// ```text
+    /// new_mode = old_mode & (~mask)
+    /// ```
+    ///
+    /// The mask is 0 by default and is currently only implemented on Unix.
+    pub fn set_mask(&mut self, mask: u32) {
+        self.inner.mask = mask;
     }
 
     /// Indicate whether extended file attributes (xattrs on Unix) are preserved
@@ -317,6 +333,7 @@ impl<'a> EntriesFields<'a> {
             long_pathname: None,
             long_linkname: None,
             pax_extensions: None,
+            mask: self.archive.inner.mask,
             unpack_xattrs: self.archive.inner.unpack_xattrs,
             preserve_permissions: self.archive.inner.preserve_permissions,
             preserve_mtime: self.archive.inner.preserve_mtime,
