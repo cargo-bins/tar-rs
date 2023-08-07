@@ -11,7 +11,7 @@ use crate::entry::{EntryFields, EntryIo};
 use crate::error::TarError;
 use crate::header::{SparseEntry, BLOCK_SIZE};
 use crate::other;
-use crate::pax::pax_extensions_size;
+use crate::pax::*;
 use crate::{Entry, GnuExtSparseHeader, Header};
 
 /// A top-level representation of an archive file.
@@ -277,7 +277,7 @@ impl<'a, R: Read> Iterator for Entries<'a, R> {
 impl<'a> EntriesFields<'a> {
     fn next_entry_raw(
         &mut self,
-        pax_size: Option<u64>,
+        pax_extensions: Option<&[u8]>,
     ) -> io::Result<Option<Entry<'a, io::Empty>>> {
         let mut header = Header::new_old();
         let mut header_pos = self.next;
@@ -315,6 +315,19 @@ impl<'a> EntriesFields<'a> {
         let cksum = header.cksum()?;
         if sum != cksum {
             return Err(other("archive header checksum mismatch"));
+        }
+
+        let mut pax_size: Option<u64> = None;
+        if let Some(pax_extensions_ref) = &pax_extensions {
+            pax_size = pax_extensions_value(pax_extensions_ref, PAX_SIZE);
+
+            if let Some(pax_uid) = pax_extensions_value(pax_extensions_ref, PAX_UID) {
+                header.set_uid(pax_uid);
+            }
+
+            if let Some(pax_gid) = pax_extensions_value(pax_extensions_ref, PAX_GID) {
+                header.set_gid(pax_gid);
+            }
         }
 
         let file_pos = self.next;
@@ -362,11 +375,10 @@ impl<'a> EntriesFields<'a> {
         let mut gnu_longname = None;
         let mut gnu_longlink = None;
         let mut pax_extensions = None;
-        let mut pax_size = None;
         let mut processed = 0;
         loop {
             processed += 1;
-            let entry = match self.next_entry_raw(pax_size)? {
+            let entry = match self.next_entry_raw(pax_extensions.as_deref())? {
                 Some(entry) => entry,
                 None if processed > 1 => {
                     return Err(other(
@@ -410,9 +422,6 @@ impl<'a> EntriesFields<'a> {
                     ));
                 }
                 pax_extensions = Some(EntryFields::from(entry).read_all()?);
-                if let Some(pax_extensions_ref) = &pax_extensions {
-                    pax_size = pax_extensions_size(pax_extensions_ref);
-                }
                 // This entry has two headers.
                 // Keep pax_extensions for the next ustar header.
                 processed -= 1;
