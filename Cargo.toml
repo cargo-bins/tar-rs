@@ -2,8 +2,8 @@
 name = "binstall-tar"
 version = "0.4.41"
 authors = ["Alex Crichton <alex@alexcrichton.com>"]
-homepage = "https://github.com/cargo-binstall/tar-rs"
-repository = "https://github.com/cargo-binstall/tar-rs"
+homepage = "https://github.com/cargo-bins/tar-rs"
+repository = "https://github.com/cargo-bins/tar-rs"
 documentation = "https://docs.rs/binstall-tar"
 license = "MIT OR Apache-2.0"
 keywords = ["tar", "tarfile", "encoding"]
