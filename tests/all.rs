@@ -1,5 +1,5 @@
 extern crate filetime;
-extern crate tar;
+extern crate binstall_tar;
 extern crate tempfile;
 #[cfg(all(unix, feature = "xattr"))]
 extern crate xattr;
@@ -10,8 +10,8 @@ use std::io::{self, Cursor};
 use std::iter::repeat;
 use std::path::{Path, PathBuf};
 
+use binstall_tar::{Archive, Builder, Entries, EntryType, Header, HeaderMode, self as tar};
 use filetime::FileTime;
-use tar::{Archive, Builder, Entries, EntryType, Header, HeaderMode};
 use tempfile::{Builder as TempBuilder, TempDir};
 
 macro_rules! t {

@@ -1,9 +1,10 @@
-extern crate tar;
+extern crate binstall_tar;
 extern crate tempfile;
 
 use std::fs::{create_dir, File};
 use std::io::Read;
 
+use binstall_tar as tar;
 use tempfile::Builder;
 
 macro_rules! t {

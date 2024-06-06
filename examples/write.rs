@@ -1,7 +1,7 @@
-extern crate tar;
+extern crate binstall_tar;
 
 use std::fs::File;
-use tar::Builder;
+use binstall_tar::Builder;
 
 fn main() {
     let file = File::create("foo.tar").unwrap();

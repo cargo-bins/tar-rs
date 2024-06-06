@@ -101,7 +101,7 @@ impl<R: Read> Archive<R> {
     ///
     /// ```no_run
     /// use std::fs::File;
-    /// use tar::Archive;
+    /// use binstall_tar::Archive;
     ///
     /// let mut ar = Archive::new(File::open("foo.tar").unwrap());
     /// ar.unpack("foo").unwrap();

@@ -4,13 +4,13 @@
 //! name as the first argument provided, and then prints the contents of that
 //! file to stdout.
 
-extern crate tar;
+extern crate binstall_tar;
 
 use std::env::args_os;
 use std::io::{copy, stdin, stdout};
 use std::path::Path;
 
-use tar::Archive;
+use binstall_tar::Archive;
 
 fn main() {
     let first_arg = args_os().skip(1).next().unwrap();

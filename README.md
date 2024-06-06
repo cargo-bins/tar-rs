@@ -7,17 +7,17 @@ A tar archive reading/writing library for Rust.
 ```toml
 # Cargo.toml
 [dependencies]
-tar = "0.4"
+binstall_tar = "0.4"
 ```
 
 ## Reading an archive
 
 ```rust,no_run
-extern crate tar;
+extern crate binstall_tar;
 
 use std::io::prelude::*;
 use std::fs::File;
-use tar::Archive;
+use binstall_tar::Archive;
 
 fn main() {
     let file = File::open("foo.tar").unwrap();
@@ -43,7 +43,7 @@ fn main() {
 ## Writing an archive
 
 ```rust,no_run
-extern crate tar;
+extern crate binstall_tar;
 
 use std::io::prelude::*;
 use std::fs::File;

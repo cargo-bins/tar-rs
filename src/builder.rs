@@ -94,7 +94,7 @@ impl<W: Write> Builder<W> {
     /// # Examples
     ///
     /// ```
-    /// use tar::{Builder, Header};
+    /// use binstall_tar::{Builder, Header};
     ///
     /// let mut header = Header::new_gnu();
     /// header.set_path("foo").unwrap();
@@ -139,7 +139,7 @@ impl<W: Write> Builder<W> {
     /// # Examples
     ///
     /// ```
-    /// use tar::{Builder, Header};
+    /// use binstall_tar::{Builder, Header};
     ///
     /// let mut header = Header::new_gnu();
     /// header.set_size(4);
@@ -184,7 +184,7 @@ impl<W: Write> Builder<W> {
     /// # Examples
     ///
     /// ```
-    /// use tar::{Builder, Header, EntryType};
+    /// use binstall_tar::{Builder, Header, EntryType};
     ///
     /// let mut ar = Builder::new(Vec::new());
     /// let mut header = Header::new_gnu();
@@ -228,7 +228,7 @@ impl<W: Write> Builder<W> {
     /// # Examples
     ///
     /// ```no_run
-    /// use tar::Builder;
+    /// use binstall_tar::Builder;
     ///
     /// let mut ar = Builder::new(Vec::new());
     ///
@@ -260,7 +260,7 @@ impl<W: Write> Builder<W> {
     /// # Examples
     ///
     /// ```no_run
-    /// use tar::Builder;
+    /// use binstall_tar::Builder;
     ///
     /// let mut ar = Builder::new(Vec::new());
     ///
@@ -301,7 +301,7 @@ impl<W: Write> Builder<W> {
     ///
     /// ```no_run
     /// use std::fs::File;
-    /// use tar::Builder;
+    /// use binstall_tar::Builder;
     ///
     /// let mut ar = Builder::new(Vec::new());
     ///
@@ -335,7 +335,7 @@ impl<W: Write> Builder<W> {
     ///
     /// ```
     /// use std::fs;
-    /// use tar::Builder;
+    /// use binstall_tar::Builder;
     ///
     /// let mut ar = Builder::new(Vec::new());
     ///
@@ -366,7 +366,7 @@ impl<W: Write> Builder<W> {
     ///
     /// ```
     /// use std::fs;
-    /// use tar::Builder;
+    /// use binstall_tar::Builder;
     ///
     /// let mut ar = Builder::new(Vec::new());
     ///
