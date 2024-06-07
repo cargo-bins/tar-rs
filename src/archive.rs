@@ -11,7 +11,7 @@ use crate::entry::{EntryFields, EntryIo};
 use crate::error::TarError;
 use crate::header::{SparseEntry, BLOCK_SIZE};
 use crate::other;
-use crate::pax::pax_extensions_size;
+use crate::pax::*;
 use crate::{Entry, GnuExtSparseHeader, Header};
 
 /// A top-level representation of an archive file.
@@ -23,6 +23,7 @@ pub struct Archive<R: ?Sized + Read> {
 
 pub struct ArchiveInner<R: ?Sized> {
     pos: Cell<u64>,
+    mask: u32,
     unpack_xattrs: bool,
     preserve_permissions: bool,
     preserve_ownerships: bool,
@@ -54,6 +55,7 @@ impl<R: Read> Archive<R> {
     pub fn new(obj: R) -> Archive<R> {
         Archive {
             inner: ArchiveInner {
+                mask: u32::MIN,
                 unpack_xattrs: false,
                 preserve_permissions: false,
                 preserve_ownerships: false,
@@ -99,7 +101,7 @@ impl<R: Read> Archive<R> {
     ///
     /// ```no_run
     /// use std::fs::File;
-    /// use tar::Archive;
+    /// use binstall_tar::Archive;
     ///
     /// let mut ar = Archive::new(File::open("foo.tar").unwrap());
     /// ar.unpack("foo").unwrap();
@@ -107,6 +109,20 @@ impl<R: Read> Archive<R> {
     pub fn unpack<P: AsRef<Path>>(&mut self, dst: P) -> io::Result<()> {
         let me: &mut Archive<dyn Read> = self;
         me._unpack(dst.as_ref())
+    }
+
+    /// Set the mask of the permission bits when unpacking this entry.
+    ///
+    /// The mask will be inverted when applying against a mode, similar to how
+    /// `umask` works on Unix. In logical notation it looks like:
+    ///
+    /// ```text
+    /// new_mode = old_mode & (~mask)
+    /// ```
+    ///
+    /// The mask is 0 by default and is currently only implemented on Unix.
+    pub fn set_mask(&mut self, mask: u32) {
+        self.inner.mask = mask;
     }
 
     /// Indicate whether extended file attributes (xattrs on Unix) are preserved
@@ -257,11 +273,11 @@ impl<'a, R: Read> Iterator for Entries<'a, R> {
     }
 }
 
-#[allow(unused_assignments)] // https://github.com/rust-lang/rust/issues/22630
+#[allow(unused_assignments)]
 impl<'a> EntriesFields<'a> {
     fn next_entry_raw(
         &mut self,
-        pax_size: Option<u64>,
+        pax_extensions: Option<&[u8]>,
     ) -> io::Result<Option<Entry<'a, io::Empty>>> {
         let mut header = Header::new_old();
         let mut header_pos = self.next;
@@ -301,6 +317,19 @@ impl<'a> EntriesFields<'a> {
             return Err(other("archive header checksum mismatch"));
         }
 
+        let mut pax_size: Option<u64> = None;
+        if let Some(pax_extensions_ref) = &pax_extensions {
+            pax_size = pax_extensions_value(pax_extensions_ref, PAX_SIZE);
+
+            if let Some(pax_uid) = pax_extensions_value(pax_extensions_ref, PAX_UID) {
+                header.set_uid(pax_uid);
+            }
+
+            if let Some(pax_gid) = pax_extensions_value(pax_extensions_ref, PAX_GID) {
+                header.set_gid(pax_gid);
+            }
+        }
+
         let file_pos = self.next;
         let mut size = header.entry_size()?;
         if size == 0 {
@@ -317,6 +346,7 @@ impl<'a> EntriesFields<'a> {
             long_pathname: None,
             long_linkname: None,
             pax_extensions: None,
+            mask: self.archive.inner.mask,
             unpack_xattrs: self.archive.inner.unpack_xattrs,
             preserve_permissions: self.archive.inner.preserve_permissions,
             preserve_mtime: self.archive.inner.preserve_mtime,
@@ -345,11 +375,10 @@ impl<'a> EntriesFields<'a> {
         let mut gnu_longname = None;
         let mut gnu_longlink = None;
         let mut pax_extensions = None;
-        let mut pax_size = None;
         let mut processed = 0;
         loop {
             processed += 1;
-            let entry = match self.next_entry_raw(pax_size)? {
+            let entry = match self.next_entry_raw(pax_extensions.as_deref())? {
                 Some(entry) => entry,
                 None if processed > 1 => {
                     return Err(other(
@@ -393,22 +422,22 @@ impl<'a> EntriesFields<'a> {
                     ));
                 }
                 pax_extensions = Some(EntryFields::from(entry).read_all()?);
-                if let Some(pax_extensions_ref) = &pax_extensions {
-                    pax_size = pax_extensions_size(pax_extensions_ref);
-                }
-                // Not an entry
-                // Keep pax_extensions for the next ustar header
+                // This entry has two headers.
+                // Keep pax_extensions for the next ustar header.
                 processed -= 1;
                 continue;
             }
 
             let mut fields = EntryFields::from(entry);
             fields.pax_extensions = pax_extensions;
+            // False positive: unused assignment
+            // https://github.com/rust-lang/rust/issues/22630
             pax_extensions = None; // Reset pax_extensions after use
-            if is_recognized_header && fields.is_pax_sparse() {
-                gnu_longname = fields.pax_sparse_name();
-            }
-            fields.long_pathname = gnu_longname;
+            fields.long_pathname = if is_recognized_header && fields.is_pax_sparse() {
+                fields.pax_sparse_name()
+            } else {
+                gnu_longname
+            };
             fields.long_linkname = gnu_longlink;
             self.parse_sparse_header(&mut fields)?;
             return Ok(Some(fields.into_entry()));
@@ -483,9 +512,7 @@ impl<'a> EntriesFields<'a> {
             let data = &mut entry.data;
             let reader = &self.archive.inner;
             let size = entry.size;
-            let mut add_block = |block: &SparseEntry| -> io::Result<_> {
-                let off = block.offset;
-                let len = block.size;
+            let mut add_block = |off: u64, len: u64| -> io::Result<_> {
                 if len != 0 && (size - remaining) % BLOCK_SIZE as u64 != 0 {
                     return Err(other(
                         "previous block in sparse file was not \
@@ -513,7 +540,7 @@ impl<'a> EntriesFields<'a> {
                 Ok(())
             };
             for block in sparse_map {
-                add_block(&block)?
+                add_block(block.offset, block.size)?
             }
             if entry.header.as_gnu().map(|gnu| gnu.is_extended()) == Some(true) {
                 let mut ext = GnuExtSparseHeader::new();
@@ -526,10 +553,7 @@ impl<'a> EntriesFields<'a> {
                     self.next += BLOCK_SIZE as u64;
                     for block in ext.sparse.iter() {
                         if !block.is_empty() {
-                            add_block(&SparseEntry {
-                                offset: block.offset()?,
-                                size: block.length()?,
-                            })?;
+                            add_block(block.offset()?, block.length()?)?;
                         }
                     }
                 }

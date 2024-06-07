@@ -2,11 +2,11 @@
 //!
 //! Takes a tarball on stdin and prints out all of the entries inside.
 
-extern crate tar;
+extern crate binstall_tar;
 
 use std::io::stdin;
 
-use tar::Archive;
+use binstall_tar::Archive;
 
 fn main() {
     let mut ar = Archive::new(stdin());
